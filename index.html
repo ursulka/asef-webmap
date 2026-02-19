@@ -1,0 +1,883 @@
+<!DOCTYPE html> 
+<html>
+<head>
+<meta charset="utf-8">
+<title>Mapbox GL JS map</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.1/mapbox-gl.css" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.1/mapbox-gl.js"></script>
+<style>
+:root {
+  --asef-white: #ffffff;
+  --asef-beige: #f6efdf;
+  --asef-dark-beige: #eee6d4;
+  --asef-light-blue: #377ee4;
+  --asef-blue: #17407d;
+  --asef-dark-blue: #001e44;
+}
+body { margin: 0; padding: 0; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; }
+#map { position: absolute; top: 0; bottom: 0; width: 100%; }
+.legend {
+  position: absolute;
+  bottom: 50px;
+  left: 50px;
+  z-index: 1;
+  background: var(--asef-white);
+  border: 1px solid var(--asef-dark-beige);
+  padding: 12px 14px;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0, 30, 68, 0.12);
+  font: 13px/1.4 'Inter', 'Helvetica Neue', Arial, sans-serif;
+}
+.legend h4 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  color: var(--asef-dark-blue);
+  letter-spacing: 0.01em;
+}
+.legend h4::before {
+  content: "◉";
+  margin-right: 6px;
+  color: var(--asef-light-blue);
+}
+.legend .item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  white-space: nowrap;
+}
+.legend input[type="checkbox"] {
+  accent-color: var(--asef-dark-blue);
+  cursor: pointer;
+}
+.legend label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--asef-dark-blue);
+  font-size: 13px;
+}
+.legend .swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.search-container {
+  position: absolute;
+  z-index: 1;
+  left: 10px;
+  top: 10px;
+  width: 280px;
+  background: var(--asef-white);
+  border: 1px solid var(--asef-dark-beige);
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0, 30, 68, 0.12);
+  padding: 12px;
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+}
+.search-container h4 {
+  margin: 0 0 10px;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  color: var(--asef-dark-blue);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.search-container h4::before {
+  content: "⌕";
+  margin-right: 6px;
+  color: var(--asef-light-blue);
+}
+.search-container input,
+.search-container label {
+  font-family: inherit;
+}
+.search-container datalist,
+.search-container option,
+.search-container input::placeholder {
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+}
+.search-container label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--asef-blue);
+  font-family: 'Outfit', 'Inter', sans-serif;
+}
+.search-container input {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--asef-dark-beige);
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-size: 12px;
+  color: var(--asef-dark-blue);
+  background: var(--asef-beige);
+}
+.search-container input:focus {
+  outline: none;
+  border-color: var(--asef-light-blue);
+  box-shadow: 0 0 0 2px rgba(55, 126, 228, 0.15);
+}
+.search-field {
+  position: relative;
+}
+.search-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 190px;
+  overflow-y: auto;
+  background: var(--asef-white);
+  border: 1px solid var(--asef-dark-beige);
+  border-radius: 6px;
+  box-shadow: 0 8px 16px rgba(0, 30, 68, 0.12);
+  display: none;
+  z-index: 20;
+}
+.search-options.open {
+  display: block;
+}
+.search-option {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--asef-dark-beige);
+  background: var(--asef-white);
+  color: var(--asef-dark-blue);
+  text-align: left;
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+}
+.search-option:last-child {
+  border-bottom: none;
+}
+.search-option:hover,
+.search-option.active {
+  background: var(--asef-beige);
+  color: var(--asef-blue);
+}
+
+.asef-popup .mapboxgl-popup-content {
+  padding: 0;
+  border-radius: 0;
+  background: var(--asef-white);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+.asef-popup .mapboxgl-popup-close-button {
+  right: 8px;
+  top: 6px;
+  color: var(--asef-dark-blue);
+  font-size: 18px;
+  line-height: 1;
+}
+.popup-card-scroll {
+  width: min(88vw, 520px);
+  max-height: min(70vh, 620px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.popup-card {
+  padding: 24px 24px 20px;
+  color: var(--asef-dark-blue);
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  background: var(--asef-white);
+}
+.popup-title {
+  margin: 0 0 6px;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 30px;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+  color: var(--asef-dark-blue);
+}
+.popup-subtitle {
+  margin: 0 0 16px;
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 500;
+  color: var(--asef-blue);
+  letter-spacing: -0.01em;
+}
+.popup-photo-link {
+  display: block;
+  margin: 0 0 14px;
+}
+.popup-photo {
+  display: block;
+  width: 100%;
+  max-width: 190px;
+  height: auto;
+  border: 2px solid var(--asef-dark-beige);
+  border-radius: 4px;
+  object-fit: cover;
+}
+.popup-section {
+  margin-top: 6px;
+}
+.popup-section-title {
+  margin: 12px 0 8px;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--asef-dark-blue);
+}
+.popup-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(100px, auto);
+  column-gap: 14px;
+  align-items: baseline;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  background: var(--asef-dark-beige);
+}
+.popup-row-label {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--asef-dark-blue);
+  line-height: 1.2;
+}
+.popup-row-value {
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--asef-blue);
+  line-height: 1.3;
+  word-break: break-word;
+}
+.popup-row-value a {
+  color: var(--asef-light-blue);
+  text-decoration: underline;
+}
+.popup-row-value a:hover {
+  color: var(--asef-blue);
+}
+.popup-link-btn {
+  display: block;
+  margin-top: 8px;
+  padding: 9px 10px;
+  text-align: center;
+  text-transform: uppercase;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  border: 2px solid var(--asef-dark-blue);
+  color: var(--asef-dark-blue);
+  background: var(--asef-white);
+}
+.popup-link-btn:hover {
+  color: var(--asef-white);
+  background: var(--asef-blue);
+  border-color: var(--asef-blue);
+}
+.popup-card-separator {
+  border: none;
+  border-top: 1px solid var(--asef-dark-beige);
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .popup-card {
+    padding: 18px 14px 14px;
+  }
+  .popup-title {
+    font-size: 24px;
+  }
+  .popup-subtitle {
+    font-size: 14px;
+  }
+  .popup-row {
+    grid-template-columns: 1fr;
+    row-gap: 4px;
+  }
+  .popup-row-value {
+    font-size: 12px;
+  }
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="search-container">
+  <h4>Search</h4>
+  <div class="search-field" style="margin-bottom:10px;">
+    <label>Search by Location</label>
+    <input type="text" id="location-search" placeholder="Enter city or state..." autocomplete="off">
+    <div id="location-options" class="search-options"></div>
+  </div>
+  <div class="search-field">
+    <label>Search by Sector</label>
+    <input type="text" id="sector-search" placeholder="Enter sector..." autocomplete="off">
+    <div id="sector-options" class="search-options"></div>
+  </div>
+</div>
+<div class="legend">
+  <h4>Legend</h4>
+  <div class="item">
+    <input type="checkbox" id="legend-entre" data-value="Entrepreneur" checked>
+    <label for="legend-entre"><span class="swatch" style="background:#377EE4;"></span>Entrepreneur</label>
+  </div>
+  <div class="item">
+    <input type="checkbox" id="legend-acad" data-value="Academic" checked>
+    <label for="legend-acad"><span class="swatch" style="background:#ee9b00;"></span>Academic</label>
+  </div>
+  <div class="item">
+    <input type="checkbox" id="legend-both" data-value="Both" checked>
+    <label for="legend-both"><span class="swatch" style="background:#001E44;"></span>Both</label>
+  </div>
+</div>
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoidWthbmppciIsImEiOiJjbWt3ZzdvZngwMjBzM2ZxcndzbXMxcXN6In0.YN_iMwj8DBVxo6hINUOpmg';
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  bounds: [[-125.0, 24.5], [-66.5, 49.5]],
+  fitBoundsOptions: {
+    padding: { top: 30, right: 30, bottom: 30, left: 30 }
+  }
+});
+
+map.on("load", async () => {
+  const res = await fetch("./data/ASEF_uporabniki.geojson");
+  const peopleGeojson = await res.json();
+  const categoryField = "Entrepreneur/ Academic/ Both";
+  const categories = ["Entrepreneur", "Academic", "Both"];
+  const categoryColors = {
+    Entrepreneur: "#377EE4",
+    Academic: "#ee9b00",
+    Both: "#001E44"
+  };
+
+  if (peopleGeojson.features?.length) {
+    console.log("FIRST FEATURE PROPERTIES:", peopleGeojson.features[0].properties);
+  }
+
+  // Extract unique locations and populate datalist
+  const uniqueLocations = new Set();
+  const uniqueSectors = new Set();
+  const locationMap = new Map(); // Maps location string to bounds
+  
+  for (const f of peopleGeojson.features) {
+    const city = f.properties?.["Location (city)"];
+    const state = f.properties?.["Location (state)"];
+    if (city && state) {
+      const locationStr = `${city}, ${state}`;
+      uniqueLocations.add(locationStr);
+      
+      // Initialize bounds for this location if not exists
+      if (!locationMap.has(locationStr)) {
+        locationMap.set(locationStr, {
+          minLng: Infinity, minLat: Infinity,
+          maxLng: -Infinity, maxLat: -Infinity,
+          coords: []
+        });
+      }
+      
+      // Track bounds for this location
+      const coords = f.geometry?.coordinates;
+      if (coords && coords.length >= 2) {
+        const [lng, lat] = coords;
+        const bounds = locationMap.get(locationStr);
+        bounds.minLng = Math.min(bounds.minLng, lng);
+        bounds.maxLng = Math.max(bounds.maxLng, lng);
+        bounds.minLat = Math.min(bounds.minLat, lat);
+        bounds.maxLat = Math.max(bounds.maxLat, lat);
+        bounds.coords.push([lng, lat]);
+      }
+    }
+    
+    // Extract sectors (split by comma as they can be multiple)
+    const sectors = f.properties?.["Sector of work"];
+    if (sectors) {
+      sectors.split(",").forEach(sector => {
+        const cleanSector = sector.trim();
+        if (cleanSector) {
+          uniqueSectors.add(cleanSector);
+        }
+      });
+    }
+  }
+  
+  const locationChoices = Array.from(uniqueLocations).sort((a, b) => a.localeCompare(b));
+  const sectorChoices = Array.from(uniqueSectors).sort((a, b) => a.localeCompare(b));
+
+  const spreadStackedCoordinates = (geojson) => {
+    const goldenAngle = 2.39996323; // radians ~137.5°
+    const spreadDeg = 0.0050; // ~550 m in latitude
+    const groups = new Map();
+
+    for (const f of geojson.features) {
+      const coords = f.geometry?.coordinates;
+      if (!coords || coords.length < 2) continue;
+      const key = `${coords[0]},${coords[1]}`;
+      const arr = groups.get(key) || [];
+      arr.push(f);
+      groups.set(key, arr);
+    }
+
+    for (const arr of groups.values()) {
+      if (arr.length === 1) continue;
+      const [lng0, lat0] = arr[0].geometry.coordinates;
+      const cosLat = Math.cos((lat0 * Math.PI) / 180);
+      arr.forEach((f, i) => {
+        const r = spreadDeg * Math.sqrt(i);
+        const angle = i * goldenAngle;
+        const dLng = (r * Math.cos(angle)) / (cosLat || 1e-6);
+        const dLat = r * Math.sin(angle);
+        f.geometry.coordinates = [lng0 + dLng, lat0 + dLat];
+      });
+    }
+    return geojson;
+  };
+
+  const baseData = spreadStackedCoordinates(peopleGeojson);
+
+  // Helper to build filtered FeatureCollection by category and sector
+  const buildCategoryCollection = (category, sectorQuery) => ({
+    type: "FeatureCollection",
+    features: baseData.features.filter(f => {
+      const matchesCategory = f.properties?.[categoryField] === category;
+      if (!matchesCategory) return false;
+      if (!sectorQuery) return true;
+      const sector = String(f.properties?.["Sector of work"] || "").toLowerCase();
+      return sector.includes(sectorQuery);
+    })
+  });
+
+  // Create clustered sources and layers per category so clusters group only same category
+  categories.forEach(cat => {
+    const srcId = `people-${cat.toLowerCase()}-src`;
+    map.addSource(srcId, {
+      type: "geojson",
+      data: buildCategoryCollection(cat, ""),
+      cluster: true,
+      clusterRadius: 50,
+      clusterMaxZoom: 10
+    });
+
+    // Cluster circles
+    map.addLayer({
+      id: `${srcId}-clusters`,
+      type: "circle",
+      source: srcId,
+      filter: ["has", "point_count"],
+      paint: {
+        "circle-color": categoryColors[cat],
+        "circle-radius": [
+          "step",
+          ["get", "point_count"],
+          14, 10,
+          18, 25,
+          24
+        ],
+        "circle-opacity": 0.75
+      }
+    });
+
+    // Cluster count labels
+    map.addLayer({
+      id: `${srcId}-cluster-count`,
+      type: "symbol",
+      source: srcId,
+      filter: ["has", "point_count"],
+      layout: {
+        "text-field": ["get", "point_count"],
+        "text-font": ["Inter Medium", "Arial Unicode MS Bold"],
+        "text-size": 12
+      },
+      paint: {
+        "text-color": "#fff"
+      }
+    });
+
+    // Unclustered points
+    map.addLayer({
+      id: `${srcId}-points`,
+      type: "circle",
+      source: srcId,
+      filter: ["!", ["has", "point_count"]],
+      paint: {
+        "circle-radius": 6,
+        "circle-color": categoryColors[cat],
+        "circle-stroke-width": 1.2,
+        "circle-stroke-color": "#fff"
+      }
+    });
+  });
+
+   // Show all stacked people that share the clicked coordinate
+  const bindPopupForLayer = (layerId) => {
+    map.on("click", layerId, (e) => {
+      // Grab every rendered point under the click, not just the top one
+    const features = map.queryRenderedFeatures(e.point, { layers: [layerId] });
+    if (!features?.length) return;
+
+    // Group features by exact coordinate so we only open one popup per stack
+    const [lng, lat] = features[0].geometry.coordinates;
+    const stacked = features.filter(
+      (f) => {
+        const [lng2, lat2] = f.geometry.coordinates;
+        return lng2 === lng && lat2 === lat;
+      }
+    );
+
+    const hidden = new Set(["Latitude", "Longitude", "How they will be shown on the map", "Extra notes"]);
+    const getGoogleDriveId = (url) => {
+      if (!url || !url.includes("drive.google.com")) return null;
+      const m1 = url.match(/\/d\/([a-zA-Z0-9_-]+)(?:\/|$)/);
+      if (m1) return m1[1];
+      const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (m2) return m2[1];
+      return null;
+    };
+    const cards = stacked.map((f) => {
+      const props = f.properties || {};
+      const personName = String(
+        props["First and Last name"] ||
+        props["First and Lasr name"] ||
+        props.name ||
+        props.Name ||
+        ""
+      ).trim();
+      const personTitle = String(props["Title"] || props.title || "").trim();
+      const pictureValue = String(props["Picture?"] || "").trim();
+      
+      // Build image HTML from the `Picture?` value.
+      // Support direct image URLs, data URLs, and Google Drive share links.
+      let imageHtml = "";
+      if (pictureValue) {
+        const pv = String(pictureValue).trim();
+        let imgSrc = null;
+
+        // Data URL or direct image file URL
+        if (pv.startsWith('data:') || pv.match(/^https?:.*\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i)) {
+          imgSrc = pv;
+        }
+
+        // Google Drive share links: /file/d/<id>/ or ?id=<id>
+        else if (pv.includes('drive.google.com')) {
+          const id = getGoogleDriveId(pv);
+          if (id) {
+            // Works better for direct rendering in <img> than share links.
+            imgSrc = `https://drive.google.com/thumbnail?id=${id}&sz=w600`;
+          }
+        }
+
+        // Fallback: try using it directly if it looks like an http(s) link
+        else if (pv.startsWith('http://') || pv.startsWith('https://')) {
+          imgSrc = pv;
+        }
+
+        if (imgSrc) {
+          // Make image clickable so user can open it directly to verify access.
+          imageHtml = `<a class="popup-photo-link" href="${imgSrc}" target="_blank" rel="noopener"><img class="popup-photo" src="${imgSrc}" onerror="this.style.display='none';"></a>`;
+        }
+      }
+      
+      const escapeHtml = (str) => String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+      const normalizeUrl = (val) => {
+        const trimmed = String(val || "").trim();
+        if (!trimmed) return "";
+        if (/^https?:\/\//i.test(trimmed)) return trimmed;
+        if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+        return "";
+      };
+      const formatValue = (rawVal) => {
+        const trimmed = String(rawVal || "").trim();
+        const safeText = escapeHtml(trimmed);
+        const normalizedUrl = normalizeUrl(trimmed);
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+        if (normalizedUrl) {
+          return `<a href="${encodeURI(normalizedUrl)}" target="_blank" rel="noopener">${safeText}</a>`;
+        }
+        if (isEmail) {
+          return `<a href="mailto:${safeText}">${safeText}</a>`;
+        }
+        return safeText;
+      };
+      const rowTemplate = (key, val) => `<div class="popup-row">
+            <div class="popup-row-label">${key}</div>
+            <div class="popup-row-value">${formatValue(val)}</div>
+          </div>`;
+      const parseContactValue = (value) => {
+        const text = String(value || "");
+        const items = [];
+        const emailMatch = text.match(/(?:Email|Email Address)\s*:\s*([^\s,;]+@[^\s,;]+)/i);
+        const linkedinMatch = text.match(/LinkedIn\s*:\s*((?:https?:\/\/|www\.)[^\s,;]+)/i);
+        const websiteMatch = text.match(/Website\s*:\s*((?:https?:\/\/|www\.)[^\s,;]+)/i);
+        if (emailMatch?.[1]) items.push({ key: "Email", value: emailMatch[1].trim() });
+        if (linkedinMatch?.[1]) items.push({ key: "LinkedIn", value: linkedinMatch[1].trim() });
+        if (websiteMatch?.[1]) items.push({ key: "Website", value: websiteMatch[1].trim() });
+        return items;
+      };
+      const entries = Object.entries(props).filter(
+        ([k, v]) =>
+          !hidden.has(k) &&
+          k !== "Picture?" &&
+          k !== "First and Last name" &&
+          k !== "First and Lasr name" &&
+          k !== "Title" &&
+          k !== "title" &&
+          v !== null &&
+          v !== undefined &&
+          String(v).trim() !== ""
+      );
+      const contactRows = [];
+      const nonContactRows = [];
+      entries.forEach(([k, v]) => {
+        const key = String(k);
+        const val = String(v).trim();
+        const lowerKey = key.toLowerCase();
+        const parsed = parseContactValue(val);
+
+        if (parsed.length > 0) {
+          parsed.forEach((item) => contactRows.push(item));
+          if (lowerKey.includes("contact")) {
+            return;
+          }
+        }
+
+        if (lowerKey.includes("email")) {
+          contactRows.push({ key: "Email", value: val });
+          return;
+        }
+        if (lowerKey.includes("linkedin")) {
+          contactRows.push({ key: "LinkedIn", value: val });
+          return;
+        }
+        if (lowerKey.includes("website")) {
+          contactRows.push({ key: "Website", value: val });
+          return;
+        }
+        nonContactRows.push([key, val]);
+      });
+
+      const dedupedContacts = [];
+      const seenContacts = new Set();
+      contactRows.forEach((item) => {
+        const k = String(item.key);
+        const v = String(item.value || "").trim();
+        if (!v) return;
+        const id = `${k.toLowerCase()}::${v.toLowerCase()}`;
+        if (seenContacts.has(id)) return;
+        seenContacts.add(id);
+        dedupedContacts.push({ key: k, value: v });
+      });
+
+      const otherRowsHtml = nonContactRows
+        .map(([k, v]) => rowTemplate(String(k), String(v)))
+        .join("");
+      const contactRowsHtml = dedupedContacts
+        .map((item) => rowTemplate(item.key, item.value))
+        .join("");
+      return `
+        <div class="popup-card">
+          <h3 class="popup-title">${personName || "Profile"}</h3>
+          ${personTitle ? `<p class="popup-subtitle">${personTitle}</p>` : ""}
+          ${imageHtml}
+          <div class="popup-section">
+            ${otherRowsHtml || (!personName && !personTitle ? "<div>No attributes</div>" : "")}
+          </div>
+          ${contactRowsHtml ? `<div class="popup-section"><div class="popup-section-title">Contact details</div>${contactRowsHtml}</div>` : ""}
+        </div>
+      `;
+    }).join("<hr class='popup-card-separator'>");
+
+    const mapHeight = map.getContainer().clientHeight || 0;
+    const viewportMargin = 20;
+    const spaceAbove = Math.max(0, e.point.y - viewportMargin);
+    const spaceBelow = Math.max(0, mapHeight - e.point.y - viewportMargin);
+    const preferredPopupHeight = 520;
+    const shouldOpenAbove = spaceBelow < preferredPopupHeight && spaceAbove > spaceBelow;
+    const popupAnchor = shouldOpenAbove ? "bottom" : "top";
+    const availableHeight = shouldOpenAbove ? spaceAbove : spaceBelow;
+    const popupMaxHeight = Math.max(240, Math.min(620, availableHeight));
+    const popup = new mapboxgl.Popup({
+      className: "asef-popup",
+      maxWidth: "560px",
+      anchor: popupAnchor,
+      offset: 12
+    })
+      .setLngLat([lng, lat])
+      .setHTML(`<div class="popup-card-scroll" style="max-height:${Math.floor(popupMaxHeight)}px;">${cards}</div>`)
+      .addTo(map);
+
+    // Always start from the top so name/title/photo are visible first.
+    const scrollEl = popup.getElement()?.querySelector(".popup-card-scroll");
+    if (scrollEl) {
+      scrollEl.scrollTop = 0;
+    }
+  });
+  };
+
+  // Bind popup handlers for each category's unclustered layer
+  categories.forEach(cat => {
+    const layerId = `people-${cat.toLowerCase()}-src-points`;
+    bindPopupForLayer(layerId);
+    map.on("mouseenter", layerId, () => { map.getCanvas().style.cursor = "pointer"; });
+    map.on("mouseleave", layerId, () => { map.getCanvas().style.cursor = ""; });
+  });
+
+  // Zoom into clusters on click
+  categories.forEach(cat => {
+    const layerId = `people-${cat.toLowerCase()}-src-clusters`;
+    map.on("click", layerId, (e) => {
+      const features = map.queryRenderedFeatures(e.point, { layers: [layerId] });
+      const clusterId = features[0]?.properties?.cluster_id;
+      const srcId = `people-${cat.toLowerCase()}-src`;
+      const source = map.getSource(srcId);
+      if (!source || clusterId === undefined) return;
+      source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+        if (err) return;
+        map.easeTo({ center: features[0].geometry.coordinates, zoom });
+      });
+    });
+    map.on("mouseenter", layerId, () => { map.getCanvas().style.cursor = "pointer"; });
+    map.on("mouseleave", layerId, () => { map.getCanvas().style.cursor = ""; });
+  });
+
+  // Checkbox filtering by category and sector search (rebuilds per-category sources)
+  const checkboxes = Array.from(document.querySelectorAll('.legend input[type="checkbox"]'));
+  const checkboxByCategory = new Map(checkboxes.map(cb => [cb.dataset.value, cb]));
+  const locationSearch = document.getElementById("location-search");
+  const sectorSearch = document.getElementById("sector-search");
+  const locationOptions = document.getElementById("location-options");
+  const sectorOptions = document.getElementById("sector-options");
+  
+  const updateFilter = () => {
+    const sectorQuery = sectorSearch.value.toLowerCase();
+
+    categories.forEach(cat => {
+      const srcId = `people-${cat.toLowerCase()}-src`;
+      const active = checkboxByCategory.get(cat)?.checked;
+      const visibility = active ? "visible" : "none";
+
+      // Update data with current sector query
+      const src = map.getSource(srcId);
+      if (src) {
+        src.setData(buildCategoryCollection(cat, sectorQuery));
+      }
+
+      // Toggle all related layers
+      ["clusters", "cluster-count", "points"].forEach(suffix => {
+        const layerId = `${srcId}-${suffix}`;
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, "visibility", visibility);
+        }
+      });
+    });
+  };
+
+  const showOptions = (optionsEl) => optionsEl.classList.add("open");
+  const hideOptions = (optionsEl) => optionsEl.classList.remove("open");
+  const getMatches = (choices, query) => {
+    const q = String(query || "").trim().toLowerCase();
+    if (!q) return choices.slice(0, 60);
+    return choices.filter((v) => v.toLowerCase().includes(q)).slice(0, 60);
+  };
+  const setOptions = (optionsEl, values, onPick) => {
+    optionsEl.innerHTML = "";
+    values.forEach((value) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "search-option";
+      btn.textContent = value;
+      btn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        onPick(value);
+      });
+      optionsEl.appendChild(btn);
+    });
+    if (values.length) {
+      showOptions(optionsEl);
+    } else {
+      hideOptions(optionsEl);
+    }
+  };
+  const applyLocationSelection = (selectedLocation) => {
+    if (!selectedLocation || !locationMap.has(selectedLocation)) return;
+    const bounds = locationMap.get(selectedLocation);
+    map.fitBounds(
+      [[bounds.minLng, bounds.minLat], [bounds.maxLng, bounds.maxLat]],
+      { padding: 50, maxZoom: 10 }
+    );
+  };
+
+  // Handle location selection and zoom (no filtering, just zoom)
+  locationSearch.addEventListener("change", () => {
+    applyLocationSelection(locationSearch.value.trim());
+  });
+  locationSearch.addEventListener("input", () => {
+    setOptions(locationOptions, getMatches(locationChoices, locationSearch.value), (value) => {
+      locationSearch.value = value;
+      hideOptions(locationOptions);
+      applyLocationSelection(value);
+    });
+  });
+  locationSearch.addEventListener("focus", () => {
+    setOptions(locationOptions, getMatches(locationChoices, locationSearch.value), (value) => {
+      locationSearch.value = value;
+      hideOptions(locationOptions);
+      applyLocationSelection(value);
+    });
+  });
+
+  sectorSearch.addEventListener("input", () => {
+    updateFilter();
+    setOptions(sectorOptions, getMatches(sectorChoices, sectorSearch.value), (value) => {
+      sectorSearch.value = value;
+      hideOptions(sectorOptions);
+      updateFilter();
+    });
+  });
+  sectorSearch.addEventListener("focus", () => {
+    setOptions(sectorOptions, getMatches(sectorChoices, sectorSearch.value), (value) => {
+      sectorSearch.value = value;
+      hideOptions(sectorOptions);
+      updateFilter();
+    });
+  });
+  document.addEventListener("click", (e) => {
+    if (!locationOptions.contains(e.target) && e.target !== locationSearch) {
+      hideOptions(locationOptions);
+    }
+    if (!sectorOptions.contains(e.target) && e.target !== sectorSearch) {
+      hideOptions(sectorOptions);
+    }
+  });
+
+  checkboxes.forEach(cb => cb.addEventListener("change", updateFilter));
+  updateFilter();
+
+}); 
+
+</script>
+</body>
+</html>
