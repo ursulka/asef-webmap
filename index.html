@@ -7,7 +7,9 @@
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.18.1/mapbox-gl.css" rel="stylesheet">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.18.1/mapbox-gl.js"></script>
 <style>
 :root {
@@ -23,7 +25,7 @@ body { margin: 0; padding: 0; font-family: 'Inter', 'Helvetica Neue', Arial, san
 .legend {
   position: absolute;
   bottom: 50px;
-  left: 50px;  
+  left: 50px;
   z-index: 1;
   background: var(--asef-white);
   border: 1px solid var(--asef-dark-beige);
@@ -360,6 +362,36 @@ const map = new mapboxgl.Map({
 map.on("load", async () => {
   const res = await fetch("./data/ASEF_uporabniki.geojson");
   const peopleGeojson = await res.json();
+  const normalizeSectorName = (value) => String(value || "").replace(/\s+/g, " ").trim();
+  const parseSectorTokens = (value) =>
+    String(value || "")
+      .split(",")
+      .map((item) => normalizeSectorName(item).toLowerCase())
+      .filter(Boolean);
+  const loadSectorsFromFiles = async (fallback) => {
+    const files = ["./data/sectors-primary.json", "./data/sectors-secondary.json"];
+    const externalSectors = new Set();
+
+    await Promise.all(
+      files.map(async (filePath) => {
+        try {
+          const response = await fetch(filePath);
+          if (!response.ok) return;
+          const payload = await response.json();
+          if (!Array.isArray(payload)) return;
+          payload.forEach((item) => {
+            const cleanSector = normalizeSectorName(item);
+            if (cleanSector) externalSectors.add(cleanSector);
+          });
+        } catch (err) {
+          // Missing optional sector file is non-fatal.
+        }
+      })
+    );
+
+    if (!externalSectors.size) return fallback;
+    return Array.from(externalSectors).sort((a, b) => a.localeCompare(b));
+  };
   const categoryField = "Entrepreneur/ Academic/ Both";
   const categories = ["Entrepreneur", "Academic", "Both"];
   const categoryColors = {
@@ -367,6 +399,10 @@ map.on("load", async () => {
     Academic: "#ee9b00",
     Both: "#001E44"
   };
+
+  if (peopleGeojson.features?.length) {
+    console.log("FIRST FEATURE PROPERTIES:", peopleGeojson.features[0].properties);
+  }
 
   // Extract unique locations and populate datalist
   const uniqueLocations = new Set();
@@ -405,8 +441,8 @@ map.on("load", async () => {
     // Extract sectors (split by comma as they can be multiple)
     const sectors = f.properties?.["Sector of work"];
     if (sectors) {
-      sectors.split(",").forEach(sector => {
-        const cleanSector = sector.trim();
+      sectors.split(",").forEach((sector) => {
+        const cleanSector = normalizeSectorName(sector);
         if (cleanSector) {
           uniqueSectors.add(cleanSector);
         }
@@ -415,7 +451,8 @@ map.on("load", async () => {
   }
   
   const locationChoices = Array.from(uniqueLocations).sort((a, b) => a.localeCompare(b));
-  const sectorChoices = Array.from(uniqueSectors).sort((a, b) => a.localeCompare(b));
+  const fallbackSectorChoices = Array.from(uniqueSectors).sort((a, b) => a.localeCompare(b));
+  const sectorChoices = await loadSectorsFromFiles(fallbackSectorChoices);
 
   const spreadStackedCoordinates = (geojson) => {
     const goldenAngle = 2.39996323; // radians ~137.5°
@@ -455,8 +492,7 @@ map.on("load", async () => {
       const matchesCategory = f.properties?.[categoryField] === category;
       if (!matchesCategory) return false;
       if (!sectorQuery) return true;
-      const sector = String(f.properties?.["Sector of work"] || "").toLowerCase();
-      return sector.includes(sectorQuery);
+      return parseSectorTokens(f.properties?.["Sector of work"]).some((sector) => sector.includes(sectorQuery));
     })
   });
 
@@ -547,12 +583,6 @@ map.on("load", async () => {
       return null;
     };
     const cards = stacked.map((f) => {
-      const escapeHtml = (str) => String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
       const props = f.properties || {};
       const personName = String(
         props["First and Last name"] ||
@@ -580,11 +610,8 @@ map.on("load", async () => {
         else if (pv.includes('drive.google.com')) {
           const id = getGoogleDriveId(pv);
           if (id) {
-            // Store both thumbnail for display and open URL for clicking
-            imgSrc = {
-              display: `https://drive.google.com/thumbnail?id=${id}&sz=w600`,
-              link: `https://drive.google.com/file/d/${id}/view`
-            };
+            // Works better for direct rendering in <img> than share links.
+            imgSrc = `https://drive.google.com/thumbnail?id=${id}&sz=w600`;
           }
         }
 
@@ -595,18 +622,16 @@ map.on("load", async () => {
 
         if (imgSrc) {
           // Make image clickable so user can open it directly to verify access.
-          const displayUrl = typeof imgSrc === 'object' ? imgSrc.display : imgSrc;
-          const linkUrl = typeof imgSrc === 'object' ? imgSrc.link : imgSrc;
-          const safeDisplayUrl = escapeHtml(displayUrl);
-          const safeLinkUrl = escapeHtml(linkUrl);
-          
-          imageHtml = `<a class="popup-photo-link" href="${safeLinkUrl}" target="_blank" rel="noopener">
-            <img class="popup-photo" src="${safeDisplayUrl}" onerror="this.style.display='none';">
-            </a>
-            `;
+          imageHtml = `<a class="popup-photo-link" href="${imgSrc}" target="_blank" rel="noopener"><img class="popup-photo" src="${imgSrc}" onerror="this.style.display='none';"></a>`;
         }
       }
       
+      const escapeHtml = (str) => String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
       const normalizeUrl = (val) => {
         const trimmed = String(val || "").trim();
         if (!trimmed) return "";
@@ -627,9 +652,21 @@ map.on("load", async () => {
         }
         return safeText;
       };
+      const formatSectorValue = (rawVal) => {
+        const parts = String(rawVal || "")
+          .split(",")
+          .map((part) => escapeHtml(part.replace(/\s+/g, " ").trim()))
+          .filter(Boolean);
+        if (!parts.length) return "";
+        return parts.map((part) => `<div>${part}</div>`).join("");
+      };
       const rowTemplate = (key, val) => `<div class="popup-row">
-            <div class="popup-row-label">${escapeHtml(key)}</div>
-            <div class="popup-row-value">${formatValue(val)}</div>
+            <div class="popup-row-label">${key}</div>
+            <div class="popup-row-value">${
+              String(key).toLowerCase() === "sector of work"
+                ? formatSectorValue(val)
+                : formatValue(val)
+            }</div>
           </div>`;
       const parseContactValue = (value) => {
         const text = String(value || "");
@@ -704,8 +741,8 @@ map.on("load", async () => {
         .join("");
       return `
         <div class="popup-card">
-          <h3 class="popup-title">${escapeHtml(personName || "Profile")}</h3>
-          ${personTitle ? `<p class="popup-subtitle">${escapeHtml(personTitle)}</p>` : ""}
+          <h3 class="popup-title">${personName || "Profile"}</h3>
+          ${personTitle ? `<p class="popup-subtitle">${personTitle}</p>` : ""}
           ${imageHtml}
           <div class="popup-section">
             ${otherRowsHtml || (!personName && !personTitle ? "<div>No attributes</div>" : "")}
@@ -777,7 +814,7 @@ map.on("load", async () => {
   const sectorOptions = document.getElementById("sector-options");
   
   const updateFilter = () => {
-    const sectorQuery = sectorSearch.value.toLowerCase();
+    const sectorQuery = normalizeSectorName(sectorSearch.value).toLowerCase();
 
     categories.forEach(cat => {
       const srcId = `people-${cat.toLowerCase()}-src`;
