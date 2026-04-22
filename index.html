@@ -349,16 +349,16 @@ body { margin: 0; padding: 0; font-family: 'Inter', 'Helvetica Neue', Arial, san
 <div class="legend">
   <h4>Legend</h4>
   <div class="item">
-    <input type="checkbox" id="legend-entre" data-value="Entrepreneur" checked>
-    <label for="legend-entre"><span class="swatch" style="background:#377EE4;"></span>Entrepreneur</label>
+    <input type="checkbox" id="legend-both" data-value="Both" checked>
+    <label for="legend-both"><span class="swatch" style="background:#001E44;"></span>Both</label>
   </div>
   <div class="item">
     <input type="checkbox" id="legend-acad" data-value="Academic" checked>
     <label for="legend-acad"><span class="swatch" style="background:#ee9b00;"></span>Academic</label>
   </div>
   <div class="item">
-    <input type="checkbox" id="legend-both" data-value="Both" checked>
-    <label for="legend-both"><span class="swatch" style="background:#001E44;"></span>Both</label>
+    <input type="checkbox" id="legend-entre" data-value="Entrepreneur" checked>
+    <label for="legend-entre"><span class="swatch" style="background:#377EE4;"></span>Entrepreneur</label>
   </div>
 </div>
 <script>
@@ -407,7 +407,7 @@ map.on("load", async () => {
     return Array.from(externalSectors).sort((a, b) => a.localeCompare(b));
   };
   const categoryField = "Entrepreneur/ Academic/ Both";
-  const categories = ["Entrepreneur", "Academic", "Both"];
+  const categories = ["Both", "Academic", "Entrepreneur"];
   const categoryColors = {
     Entrepreneur: "#377EE4",
     Academic: "#ee9b00",
