@@ -7,7 +7,9 @@
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.18.1/mapbox-gl.css" rel="stylesheet">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.18.1/mapbox-gl.js"></script>
 <style>
 :root {
@@ -368,6 +370,10 @@ map.on("load", async () => {
     Both: "#001E44"
   };
 
+  if (peopleGeojson.features?.length) {
+    console.log("FIRST FEATURE PROPERTIES:", peopleGeojson.features[0].properties);
+  }
+
   // Extract unique locations and populate datalist
   const uniqueLocations = new Set();
   const uniqueSectors = new Set();
@@ -586,12 +592,7 @@ map.on("load", async () => {
 
         if (imgSrc) {
           // Make image clickable so user can open it directly to verify access.
-          const safeImgSrc = escapeHtml(imgSrc);
-          
-          imageHtml = `<a class="popup-photo-link" href="${safeImgSrc}" target="_blank" rel="noopener">
-            <img class="popup-photo" src="${safeImgSrc}" onerror="this.style.display='none';">
-            </a>
-            `;
+          imageHtml = `<a class="popup-photo-link" href="${imgSrc}" target="_blank" rel="noopener"><img class="popup-photo" src="${imgSrc}" onerror="this.style.display='none';"></a>`;
         }
       }
       
@@ -622,7 +623,7 @@ map.on("load", async () => {
         return safeText;
       };
       const rowTemplate = (key, val) => `<div class="popup-row">
-            <div class="popup-row-label">${escapeHtml(key)}</div>
+            <div class="popup-row-label">${key}</div>
             <div class="popup-row-value">${formatValue(val)}</div>
           </div>`;
       const parseContactValue = (value) => {
@@ -698,8 +699,8 @@ map.on("load", async () => {
         .join("");
       return `
         <div class="popup-card">
-          <h3 class="popup-title">${escapeHtml(personName || "Profile")}</h3>
-          ${personTitle ? `<p class="popup-subtitle">${escapeHtml(personTitle)}</p>` : ""}
+          <h3 class="popup-title">${personName || "Profile"}</h3>
+          ${personTitle ? `<p class="popup-subtitle">${personTitle}</p>` : ""}
           ${imageHtml}
           <div class="popup-section">
             ${otherRowsHtml || (!personName && !personTitle ? "<div>No attributes</div>" : "")}
