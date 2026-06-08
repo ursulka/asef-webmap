@@ -547,6 +547,12 @@ map.on("load", async () => {
       return null;
     };
     const cards = stacked.map((f) => {
+      const escapeHtml = (str) => String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
       const props = f.properties || {};
       const personName = String(
         props["First and Last name"] ||
@@ -574,8 +580,11 @@ map.on("load", async () => {
         else if (pv.includes('drive.google.com')) {
           const id = getGoogleDriveId(pv);
           if (id) {
-            // Works better for direct rendering in <img> than share links.
-            imgSrc = `https://drive.google.com/thumbnail?id=${id}&sz=w600`;
+            // Store both thumbnail for display and open URL for clicking
+            imgSrc = {
+              display: `https://drive.google.com/thumbnail?id=${id}&sz=w600`,
+              link: `https://drive.google.com/file/d/${id}/view`
+            };
           }
         }
 
@@ -586,21 +595,18 @@ map.on("load", async () => {
 
         if (imgSrc) {
           // Make image clickable so user can open it directly to verify access.
-          const safeImgSrc = escapeHtml(imgSrc);
+          const displayUrl = typeof imgSrc === 'object' ? imgSrc.display : imgSrc;
+          const linkUrl = typeof imgSrc === 'object' ? imgSrc.link : imgSrc;
+          const safeDisplayUrl = escapeHtml(displayUrl);
+          const safeLinkUrl = escapeHtml(linkUrl);
           
-          imageHtml = `<a class="popup-photo-link" href="${safeImgSrc}" target="_blank" rel="noopener">
-            <img class="popup-photo" src="${safeImgSrc}" onerror="this.style.display='none';">
+          imageHtml = `<a class="popup-photo-link" href="${safeLinkUrl}" target="_blank" rel="noopener">
+            <img class="popup-photo" src="${safeDisplayUrl}" onerror="this.style.display='none';">
             </a>
             `;
         }
       }
       
-      const escapeHtml = (str) => String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
       const normalizeUrl = (val) => {
         const trimmed = String(val || "").trim();
         if (!trimmed) return "";
