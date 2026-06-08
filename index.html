@@ -368,6 +368,20 @@ map.on("load", async () => {
     Both: "#001E44"
   };
 
+  const searchPanel = document.querySelector(".search-container");
+  const legendPanel = document.querySelector(".legend");
+
+  const hideSearchAndLegend = () => {
+    if (searchPanel) searchPanel.style.display = "none";
+    if (legendPanel) legendPanel.style.display = "none";
+  };
+
+  const showSearchAndLegend = () => {
+    if (searchPanel) searchPanel.style.display = "";
+    if  (legendPanel) legendPanel.style.display = "";
+  };  
+  
+
   // Extract unique locations and populate datalist
   const uniqueLocations = new Set();
   const uniqueSectors = new Set();
@@ -524,7 +538,9 @@ map.on("load", async () => {
    // Show all stacked people that share the clicked coordinate
   const bindPopupForLayer = (layerId) => {
     map.on("click", layerId, (e) => {
-      // Grab every rendered point under the click, not just the top one
+    hideSearchAndLegend();
+
+    // Grab every rendered point under the click, not just the top one
     const features = map.queryRenderedFeatures(e.point, { layers: [layerId] });
     if (!features?.length) return;
 
@@ -733,6 +749,8 @@ map.on("load", async () => {
       .setLngLat([lng, lat])
       .setHTML(`<div class="popup-card-scroll" style="max-height:${Math.floor(popupMaxHeight)}px;">${cards}</div>`)
       .addTo(map);
+
+    popup.on("close", showSearchAndLegend);  
 
     // Always start from the top so name/title/photo are visible first.
     const scrollEl = popup.getElement()?.querySelector(".popup-card-scroll");
