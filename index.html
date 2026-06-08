@@ -23,7 +23,7 @@ body { margin: 0; padding: 0; font-family: 'Inter', 'Helvetica Neue', Arial, san
 .legend {
   position: absolute;
   bottom: 50px;
-  left: 50px;
+  left: 50px;  
   z-index: 1;
   background: var(--asef-white);
   border: 1px solid var(--asef-dark-beige);
@@ -127,20 +127,6 @@ body { margin: 0; padding: 0; font-family: 'Inter', 'Helvetica Neue', Arial, san
   outline: none;
   border-color: var(--asef-light-blue);
   box-shadow: 0 0 0 2px rgba(55, 126, 228, 0.15);
-}
-#sector-checkboxes input[type="checkbox"] {
-  accent-color: var(--asef-dark-blue);
-  cursor: pointer;
-}
-#sector-checkboxes label {
-  cursor: pointer;
-  color: var(--asef-dark-blue);
-  font-size: 13px;
-  margin: 0;
-  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
-}
-#sector-checkboxes > div:last-child {
-  border-bottom: none;
 }
 .search-field {
   position: relative;
@@ -340,23 +326,23 @@ body { margin: 0; padding: 0; font-family: 'Inter', 'Helvetica Neue', Arial, san
   </div>
   <div class="search-field">
     <label>Search by Sector</label>
-    <input type="text" id="sector-search" placeholder="Select sectors..." autocomplete="off">
-    <div id="sector-checkboxes" class="search-options"></div>
+    <input type="text" id="sector-search" placeholder="Enter sector..." autocomplete="off">
+    <div id="sector-options" class="search-options"></div>
   </div>
 </div>
 <div class="legend">
   <h4>Legend</h4>
   <div class="item">
-    <input type="checkbox" id="legend-both" data-value="Both" checked>
-    <label for="legend-both"><span class="swatch" style="background:#001E44;"></span>Both</label>
+    <input type="checkbox" id="legend-entre" data-value="Entrepreneur" checked>
+    <label for="legend-entre"><span class="swatch" style="background:#377EE4;"></span>Entrepreneur</label>
   </div>
   <div class="item">
     <input type="checkbox" id="legend-acad" data-value="Academic" checked>
     <label for="legend-acad"><span class="swatch" style="background:#ee9b00;"></span>Academic</label>
   </div>
   <div class="item">
-    <input type="checkbox" id="legend-entre" data-value="Entrepreneur" checked>
-    <label for="legend-entre"><span class="swatch" style="background:#377EE4;"></span>Entrepreneur</label>
+    <input type="checkbox" id="legend-both" data-value="Both" checked>
+    <label for="legend-both"><span class="swatch" style="background:#001E44;"></span>Both</label>
   </div>
 </div>
 <script>
@@ -374,38 +360,8 @@ const map = new mapboxgl.Map({
 map.on("load", async () => {
   const res = await fetch("./data/ASEF_uporabniki.geojson");
   const peopleGeojson = await res.json();
-  const normalizeSectorName = (value) => String(value || "").replace(/\s+/g, " ").trim();
-  const parseSectorTokens = (value) =>
-    String(value || "")
-      .split(",")
-      .map((item) => normalizeSectorName(item).toLowerCase())
-      .filter(Boolean);
-  const loadSectorsFromFiles = async (fallback) => {
-    const files = ["./data/sectors-primary.json", "./data/sectors-secondary.json"];
-    const externalSectors = new Set();
-
-    await Promise.all(
-      files.map(async (filePath) => {
-        try {
-          const response = await fetch(filePath);
-          if (!response.ok) return;
-          const payload = await response.json();
-          if (!Array.isArray(payload)) return;
-          payload.forEach((item) => {
-            const cleanSector = normalizeSectorName(item);
-            if (cleanSector) externalSectors.add(cleanSector);
-          });
-        } catch (err) {
-          // Missing optional sector file is non-fatal.
-        }
-      })
-    );
-
-    if (!externalSectors.size) return fallback;
-    return Array.from(externalSectors).sort((a, b) => a.localeCompare(b));
-  };
   const categoryField = "Entrepreneur/ Academic/ Both";
-  const categories = ["Both", "Academic", "Entrepreneur"];
+  const categories = ["Entrepreneur", "Academic", "Both"];
   const categoryColors = {
     Entrepreneur: "#377EE4",
     Academic: "#ee9b00",
@@ -449,8 +405,8 @@ map.on("load", async () => {
     // Extract sectors (split by comma as they can be multiple)
     const sectors = f.properties?.["Sector of work"];
     if (sectors) {
-      sectors.split(",").forEach((sector) => {
-        const cleanSector = normalizeSectorName(sector);
+      sectors.split(",").forEach(sector => {
+        const cleanSector = sector.trim();
         if (cleanSector) {
           uniqueSectors.add(cleanSector);
         }
@@ -459,12 +415,11 @@ map.on("load", async () => {
   }
   
   const locationChoices = Array.from(uniqueLocations).sort((a, b) => a.localeCompare(b));
-  const fallbackSectorChoices = Array.from(uniqueSectors).sort((a, b) => a.localeCompare(b));
-  const sectorChoices = await loadSectorsFromFiles(fallbackSectorChoices);
+  const sectorChoices = Array.from(uniqueSectors).sort((a, b) => a.localeCompare(b));
 
   const spreadStackedCoordinates = (geojson) => {
     const goldenAngle = 2.39996323; // radians ~137.5°
-    const spreadDeg = 0.0080; // ~880 m in latitude
+    const spreadDeg = 0.0050; // ~550 m in latitude
     const groups = new Map();
 
     for (const f of geojson.features) {
@@ -494,16 +449,14 @@ map.on("load", async () => {
   const baseData = spreadStackedCoordinates(peopleGeojson);
 
   // Helper to build filtered FeatureCollection by category and sector
-  const buildCategoryCollection = (category, selectedSectors) => ({
+  const buildCategoryCollection = (category, sectorQuery) => ({
     type: "FeatureCollection",
     features: baseData.features.filter(f => {
       const matchesCategory = f.properties?.[categoryField] === category;
       if (!matchesCategory) return false;
-      if (!selectedSectors || selectedSectors.length === 0) return true;
-      const sectorTokens = parseSectorTokens(f.properties?.["Sector of work"]);
-      return selectedSectors.some((selectedSector) =>
-        sectorTokens.some((token) => token.includes(selectedSector.toLowerCase()))
-      );
+      if (!sectorQuery) return true;
+      const sector = String(f.properties?.["Sector of work"] || "").toLowerCase();
+      return sector.includes(sectorQuery);
     })
   });
 
@@ -512,7 +465,7 @@ map.on("load", async () => {
     const srcId = `people-${cat.toLowerCase()}-src`;
     map.addSource(srcId, {
       type: "geojson",
-      data: buildCategoryCollection(cat, []),
+      data: buildCategoryCollection(cat, ""),
       cluster: true,
       clusterRadius: 50,
       clusterMaxZoom: 10
@@ -529,9 +482,9 @@ map.on("load", async () => {
         "circle-radius": [
           "step",
           ["get", "point_count"],
-          21, 10,
-          27, 25,
-          36
+          14, 10,
+          18, 25,
+          24
         ],
         "circle-opacity": 0.75
       }
@@ -560,7 +513,7 @@ map.on("load", async () => {
       source: srcId,
       filter: ["!", ["has", "point_count"]],
       paint: {
-        "circle-radius": 9,
+        "circle-radius": 6,
         "circle-color": categoryColors[cat],
         "circle-stroke-width": 1.2,
         "circle-stroke-color": "#fff"
@@ -594,6 +547,12 @@ map.on("load", async () => {
       return null;
     };
     const cards = stacked.map((f) => {
+      const escapeHtml = (str) => String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
       const props = f.properties || {};
       const personName = String(
         props["First and Last name"] ||
@@ -621,8 +580,11 @@ map.on("load", async () => {
         else if (pv.includes('drive.google.com')) {
           const id = getGoogleDriveId(pv);
           if (id) {
-            // Works better for direct rendering in <img> than share links.
-            imgSrc = `https://drive.google.com/thumbnail?id=${id}&sz=w600`;
+            // Store both thumbnail for display and open URL for clicking
+            imgSrc = {
+              display: `https://drive.google.com/thumbnail?id=${id}&sz=w600`,
+              link: `https://drive.google.com/file/d/${id}/view`
+            };
           }
         }
 
@@ -633,21 +595,18 @@ map.on("load", async () => {
 
         if (imgSrc) {
           // Make image clickable so user can open it directly to verify access.
-          const safeImgSrc = escapeHtml(imgSrc);
+          const displayUrl = typeof imgSrc === 'object' ? imgSrc.display : imgSrc;
+          const linkUrl = typeof imgSrc === 'object' ? imgSrc.link : imgSrc;
+          const safeDisplayUrl = escapeHtml(displayUrl);
+          const safeLinkUrl = escapeHtml(linkUrl);
           
-          imageHtml = `<a class="popup-photo-link" href="${safeImgSrc}" target="_blank" rel="noopener">
-            <img class="popup-photo" src="${safeImgSrc}" onerror="this.style.display='none';">
+          imageHtml = `<a class="popup-photo-link" href="${safeLinkUrl}" target="_blank" rel="noopener">
+            <img class="popup-photo" src="${safeDisplayUrl}" onerror="this.style.display='none';">
             </a>
             `;
         }
       }
       
-      const escapeHtml = (str) => String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
       const normalizeUrl = (val) => {
         const trimmed = String(val || "").trim();
         if (!trimmed) return "";
@@ -668,16 +627,8 @@ map.on("load", async () => {
         }
         return safeText;
       };
-      const formatSectorValue = (rawVal) => {
-        const parts = String(rawVal || "")
-          .split(",")
-          .map((part) => escapeHtml(part.replace(/\s+/g, " ").trim()))
-          .filter(Boolean);
-        if (!parts.length) return "";
-        return parts.map((part) => `<div>${part}</div>`).join("");
-      };
       const rowTemplate = (key, val) => `<div class="popup-row">
-            <div class="popup-row-label">${key}</div>
+            <div class="popup-row-label">${escapeHtml(key)}</div>
             <div class="popup-row-value">${formatValue(val)}</div>
           </div>`;
       const parseContactValue = (value) => {
@@ -783,18 +734,6 @@ map.on("load", async () => {
       .setHTML(`<div class="popup-card-scroll" style="max-height:${Math.floor(popupMaxHeight)}px;">${cards}</div>`)
       .addTo(map);
 
-    // Hide search and legend when popup opens
-    const searchContainer = document.querySelector('.search-container');
-    const legend = document.querySelector('.legend');
-    if (searchContainer) searchContainer.style.display = 'none';
-    if (legend) legend.style.display = 'none';
-
-    // Show search and legend when popup closes
-    popup.on('close', () => {
-      if (searchContainer) searchContainer.style.display = '';
-      if (legend) legend.style.display = '';
-    });
-
     // Always start from the top so name/title/photo are visible first.
     const scrollEl = popup.getElement()?.querySelector(".popup-card-scroll");
     if (scrollEl) {
@@ -835,22 +774,20 @@ map.on("load", async () => {
   const locationSearch = document.getElementById("location-search");
   const sectorSearch = document.getElementById("sector-search");
   const locationOptions = document.getElementById("location-options");
-  const sectorCheckboxesContainer = document.getElementById("sector-checkboxes");
+  const sectorOptions = document.getElementById("sector-options");
   
   const updateFilter = () => {
-    // Get all selected sectors from checkboxes
-    const selectedSectors = Array.from(document.querySelectorAll('#sector-checkboxes input[type="checkbox"]:checked'))
-      .map(cb => cb.dataset.value);
+    const sectorQuery = sectorSearch.value.toLowerCase();
 
     categories.forEach(cat => {
       const srcId = `people-${cat.toLowerCase()}-src`;
       const active = checkboxByCategory.get(cat)?.checked;
       const visibility = active ? "visible" : "none";
 
-      // Update data with current sector filters
+      // Update data with current sector query
       const src = map.getSource(srcId);
       if (src) {
-        src.setData(buildCategoryCollection(cat, selectedSectors));
+        src.setData(buildCategoryCollection(cat, sectorQuery));
       }
 
       // Toggle all related layers
@@ -898,48 +835,6 @@ map.on("load", async () => {
     );
   };
 
-  // Populate sector checkboxes in dropdown
-  const populateSectorCheckboxes = (filterText = "") => {
-    const matchedSectors = getMatches(sectorChoices, filterText);
-    sectorCheckboxesContainer.innerHTML = "";
-    matchedSectors.forEach((sector) => {
-      const div = document.createElement("div");
-      div.style.display = "flex";
-      div.style.alignItems = "center";
-      div.style.gap = "8px";
-      div.style.padding = "8px 10px";
-      div.style.borderBottom = "1px solid var(--asef-dark-beige)";
-      
-      const label = document.createElement("label");
-      label.htmlFor = `sector-${sector.replace(/\s+/g, "-")}`;
-      label.textContent = sector;
-      label.style.cursor = "pointer";
-      label.style.color = "var(--asef-dark-blue)";
-      label.style.fontSize = "13px";
-      label.style.margin = "0";
-      label.style.flex = "1";
-      
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.id = `sector-${sector.replace(/\s+/g, "-")}`;
-      checkbox.dataset.value = sector;
-      checkbox.checked = false;
-      checkbox.style.cursor = "pointer";
-      checkbox.style.accentColor = "var(--asef-dark-blue)";
-      checkbox.style.width = "18px";
-      checkbox.style.height = "18px";
-      checkbox.style.flexShrink = "0";
-      checkbox.addEventListener("change", updateFilter);
-      
-      div.appendChild(label);
-      div.appendChild(checkbox);
-      sectorCheckboxesContainer.appendChild(div);
-    });
-    if (matchedSectors.length) {
-      showOptions(sectorCheckboxesContainer);
-    }
-  };
-
   // Handle location selection and zoom (no filtering, just zoom)
   locationSearch.addEventListener("change", () => {
     applyLocationSelection(locationSearch.value.trim());
@@ -959,20 +854,27 @@ map.on("load", async () => {
     });
   });
 
-  // Handle sector search dropdown
-  sectorSearch.addEventListener("focus", () => {
-    populateSectorCheckboxes(sectorSearch.value);
-  });
   sectorSearch.addEventListener("input", () => {
-    populateSectorCheckboxes(sectorSearch.value);
+    updateFilter();
+    setOptions(sectorOptions, getMatches(sectorChoices, sectorSearch.value), (value) => {
+      sectorSearch.value = value;
+      hideOptions(sectorOptions);
+      updateFilter();
+    });
   });
-  
+  sectorSearch.addEventListener("focus", () => {
+    setOptions(sectorOptions, getMatches(sectorChoices, sectorSearch.value), (value) => {
+      sectorSearch.value = value;
+      hideOptions(sectorOptions);
+      updateFilter();
+    });
+  });
   document.addEventListener("click", (e) => {
     if (!locationOptions.contains(e.target) && e.target !== locationSearch) {
       hideOptions(locationOptions);
     }
-    if (!sectorCheckboxesContainer.contains(e.target) && e.target !== sectorSearch) {
-      hideOptions(sectorCheckboxesContainer);
+    if (!sectorOptions.contains(e.target) && e.target !== sectorSearch) {
+      hideOptions(sectorOptions);
     }
   });
 
