@@ -170,6 +170,54 @@ body { margin: 0; padding: 0; font-family: 'Inter', 'Helvetica Neue', Arial, san
   color: var(--asef-blue);
 }
 
+.sector-checkbox-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  background: var(--asef-beige);
+  border: 1px solid var(--asef-dark-beige);
+  border-radius: 6px;
+}
+
+.sector-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--asef-dark-beige);
+  transition: background-color 0.2s ease;
+}
+
+.sector-checkbox-item:last-child {
+  border-bottom: none;
+}
+
+.sector-checkbox-item:hover {
+  background-color: var(--asef-white);
+}
+
+.sector-checkbox-item input[type="checkbox"] {
+  accent-color: var(--asef-dark-blue);
+  cursor: pointer;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.sector-checkbox-item label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--asef-dark-blue);
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0;
+  flex: 1;
+}
+
 .asef-popup .mapboxgl-popup-content {
   padding: 0;
   border-radius: 0;
@@ -326,8 +374,7 @@ body { margin: 0; padding: 0; font-family: 'Inter', 'Helvetica Neue', Arial, san
   </div>
   <div class="search-field">
     <label>Search by Sector</label>
-    <input type="text" id="sector-search" placeholder="Enter sector..." autocomplete="off">
-    <div id="sector-options" class="search-options"></div>
+    <div id="sector-checkboxes" class="sector-checkbox-container"></div>
   </div>
 </div>
 <div class="legend">
@@ -463,14 +510,16 @@ map.on("load", async () => {
   const baseData = spreadStackedCoordinates(peopleGeojson);
 
   // Helper to build filtered FeatureCollection by category and sector
-  const buildCategoryCollection = (category, sectorQuery) => ({
+  const buildCategoryCollection = (category, selectedSectors) => ({
     type: "FeatureCollection",
     features: baseData.features.filter(f => {
       const matchesCategory = f.properties?.[categoryField] === category;
       if (!matchesCategory) return false;
-      if (!sectorQuery) return true;
-      const sector = String(f.properties?.["Sector of work"] || "").toLowerCase();
-      return sector.includes(sectorQuery);
+      if (selectedSectors.length === 0) return true;
+      const personSectors = String(f.properties?.["Sector of work"] || "").toLowerCase();
+      return selectedSectors.some(sector => 
+        personSectors.includes(sector.toLowerCase())
+      );
     })
   });
 
@@ -790,12 +839,12 @@ map.on("load", async () => {
   const checkboxes = Array.from(document.querySelectorAll('.legend input[type="checkbox"]'));
   const checkboxByCategory = new Map(checkboxes.map(cb => [cb.dataset.value, cb]));
   const locationSearch = document.getElementById("location-search");
-  const sectorSearch = document.getElementById("sector-search");
   const locationOptions = document.getElementById("location-options");
-  const sectorOptions = document.getElementById("sector-options");
+  const sectorCheckboxesContainer = document.getElementById("sector-checkboxes");
+  const selectedSectors = new Set();
   
   const updateFilter = () => {
-    const sectorQuery = sectorSearch.value.toLowerCase();
+    const sectorArray = Array.from(selectedSectors);
 
     categories.forEach(cat => {
       const srcId = `people-${cat.toLowerCase()}-src`;
@@ -805,7 +854,7 @@ map.on("load", async () => {
       // Update data with current sector query
       const src = map.getSource(srcId);
       if (src) {
-        src.setData(buildCategoryCollection(cat, sectorQuery));
+        src.setData(buildCategoryCollection(cat, sectorArray));
       }
 
       // Toggle all related layers
@@ -853,6 +902,34 @@ map.on("load", async () => {
     );
   };
 
+  // Populate sector checkboxes
+  sectorChoices.forEach((sector, index) => {
+    const checkboxId = `sector-checkbox-${index}`;
+    const itemDiv = document.createElement("div");
+    itemDiv.className = "sector-checkbox-item";
+    
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.id = checkboxId;
+    checkbox.value = sector;
+    checkbox.addEventListener("change", (e) => {
+      if (e.target.checked) {
+        selectedSectors.add(sector);
+      } else {
+        selectedSectors.delete(sector);
+      }
+      updateFilter();
+    });
+    
+    const label = document.createElement("label");
+    label.htmlFor = checkboxId;
+    label.textContent = sector;
+    
+    itemDiv.appendChild(checkbox);
+    itemDiv.appendChild(label);
+    sectorCheckboxesContainer.appendChild(itemDiv);
+  });
+
   // Handle location selection and zoom (no filtering, just zoom)
   locationSearch.addEventListener("change", () => {
     applyLocationSelection(locationSearch.value.trim());
@@ -871,28 +948,9 @@ map.on("load", async () => {
       applyLocationSelection(value);
     });
   });
-
-  sectorSearch.addEventListener("input", () => {
-    updateFilter();
-    setOptions(sectorOptions, getMatches(sectorChoices, sectorSearch.value), (value) => {
-      sectorSearch.value = value;
-      hideOptions(sectorOptions);
-      updateFilter();
-    });
-  });
-  sectorSearch.addEventListener("focus", () => {
-    setOptions(sectorOptions, getMatches(sectorChoices, sectorSearch.value), (value) => {
-      sectorSearch.value = value;
-      hideOptions(sectorOptions);
-      updateFilter();
-    });
-  });
   document.addEventListener("click", (e) => {
     if (!locationOptions.contains(e.target) && e.target !== locationSearch) {
       hideOptions(locationOptions);
-    }
-    if (!sectorOptions.contains(e.target) && e.target !== sectorSearch) {
-      hideOptions(sectorOptions);
     }
   });
 
